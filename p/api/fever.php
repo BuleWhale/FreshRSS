@@ -81,7 +81,7 @@ class FeverDAO extends Minz_ModelPdo
 		$entryDAO = FreshRSS_Factory::createEntryDao();
 
 		$sql = 'SELECT id, guid, title, author, '
-			. ($entryDAO->isCompressed() ? 'UNCOMPRESS(content_bin) AS content' : 'content')
+			. ($entryDAO::isCompressed() ? 'UNCOMPRESS(content_bin) AS content' : 'content')
 			. ', link, date, is_read, is_favorite, id_feed '
 			. 'FROM `_entry` WHERE';
 
@@ -155,7 +155,7 @@ class FeverAPI
 			$username = @file_get_contents(DATA_PATH . '/fever/.key-' . sha1(FreshRSS_Context::$system_conf->salt) . '-' . $feverKey . '.txt', false);
 			if ($username != false) {
 				$username = trim($username);
-				FreshRSS_Context::initUser($username);
+				FreshRSS_Context::$user_conf = FreshRSS_Context::initUser($username);	// Assignment to help PHPStan
 				if (FreshRSS_Context::$user_conf != null && $feverKey === FreshRSS_Context::$user_conf->feverKey && FreshRSS_Context::$user_conf->enabled) {
 					Minz_Translate::init(FreshRSS_Context::$user_conf->language);
 					$this->entryDAO = FreshRSS_Factory::createEntryDao();

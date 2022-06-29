@@ -363,7 +363,7 @@ SQL;
 		if ($stm !== false) {
 			return self::daoToFeed($stm->fetchAll(PDO::FETCH_ASSOC));
 		} else {
-			$info = $stm == null ? $this->pdo->errorInfo() : $stm->errorInfo();
+			$info = $this->pdo->errorInfo();
 			if ($this->autoUpdateDb($info)) {
 				return $this->listFeedsOrderUpdate($defaultCacheDuration);
 			}
@@ -447,7 +447,8 @@ SQL;
 	}
 
 	/**
-	 * @return int|false
+	 * Remember to call updateCachedValues() after calling this function
+	 * @return int|false number of lines affected or false in case of error
 	 */
 	public function keepMaxUnread(int $id, int $n) {
 		//Double SELECT for MySQL workaround ERROR 1093 (HY000)
@@ -461,32 +462,41 @@ WHERE id_feed=:id_feed1 AND is_read=0 AND id <= (SELECT e3.id FROM (
 	OFFSET :limit) e3)
 SQL;
 
-		$stm = $this->pdo->prepare($sql);
-		$stm->bindParam(':id_feed1', $id, PDO::PARAM_INT);
-		$stm->bindParam(':id_feed2', $id, PDO::PARAM_INT);
-		$stm->bindParam(':limit', $n, PDO::PARAM_INT);
-
-		if (!$stm || !$stm->execute()) {
+		if (($stm = $this->pdo->prepare($sql)) &&
+			$stm->bindParam(':id_feed1', $id, PDO::PARAM_INT) &&
+			$stm->bindParam(':id_feed2', $id, PDO::PARAM_INT) &&
+			$stm->bindParam(':limit', $n, PDO::PARAM_INT) &&
+			$stm->execute()) {
+			return $stm->rowCount();
+		} else {
 			$info = $stm == null ? $this->pdo->errorInfo() : $stm->errorInfo();
 			Minz_Log::error('SQL error keepMaxUnread: ' . json_encode($info));
 			return false;
 		}
-		$affected = $stm->rowCount();
+	}
 
-		if ($affected > 0) {
-			$sql = 'UPDATE `_feed` '
-				 . 'SET `cache_nbUnreads`=`cache_nbUnreads`-' . $affected
-				 . ' WHERE id=:id';
-			$stm = $this->pdo->prepare($sql);
-			$stm->bindParam(':id', $id, PDO::PARAM_INT);
-			if (!($stm && $stm->execute())) {
-				$info = $stm == null ? $this->pdo->errorInfo() : $stm->errorInfo();
-				Minz_Log::error('SQL error keepMaxUnread cache: ' . json_encode($info));
-				return false;
-			}
+	/**
+	 * Remember to call updateCachedValues() after calling this function
+	 * @return int|false number of lines affected or false in case of error
+	 */
+	public function markAsReadUponGone(int $id) {
+		//Double SELECT for MySQL workaround ERROR 1093 (HY000)
+		$sql = <<<'SQL'
+UPDATE `_entry` SET is_read=1
+WHERE id_feed=:id_feed1 AND is_read=0 AND `lastSeen` < (SELECT e3.maxlastseen FROM (
+	SELECT MAX(e2.`lastSeen`) AS maxlastseen FROM `_entry` e2 WHERE e2.id_feed = :id_feed2) e3)
+SQL;
+
+		if (($stm = $this->pdo->prepare($sql)) &&
+			$stm->bindParam(':id_feed1', $id, PDO::PARAM_INT) &&
+			$stm->bindParam(':id_feed2', $id, PDO::PARAM_INT) &&
+			$stm->execute()) {
+			return $stm->rowCount();
+		} else {
+			$info = $stm == null ? $this->pdo->errorInfo() : $stm->errorInfo();
+			Minz_Log::error('SQL error markAsReadUponGone: ' . json_encode($info));
+			return false;
 		}
-
-		return $affected;
 	}
 
 	/**
@@ -600,7 +610,7 @@ SQL;
 			$sql2 = 'ALTER TABLE `_feed` ADD COLUMN ttl INT NOT NULL DEFAULT ' . FreshRSS_Feed::TTL_DEFAULT;	//v0.7.3
 			$stm = $this->pdo->query($sql2);
 			if ($stm === false) {
-				$info = $stm == null ? $this->pdo->errorInfo() : $stm->errorInfo();
+				$info = $this->pdo->errorInfo();
 				Minz_Log::error('SQL error updateTTL 2: ' . $info[2] . ' ' . $sql2);
 			}
 		} else {

@@ -148,7 +148,7 @@ function open_slider_listener(ev) {
 	const a = ev.target.closest('.open-slider');
 	if (a) {
 		if (!context.ajax_loading) {
-			location.href = '#'; // close menu/dropdown
+			location.href = '#slider'; // close menu/dropdown
 			context.ajax_loading = true;
 
 			const req = new XMLHttpRequest();
@@ -156,11 +156,8 @@ function open_slider_listener(ev) {
 			req.responseType = 'document';
 			req.onload = function (e) {
 				const slider = document.getElementById('slider');
-				const closer = document.getElementById('close-slider');
 				slider.scrollTop = 0;
 				slider.innerHTML = this.response.body.innerHTML;
-				slider.classList.add('active');
-				closer.classList.add('active');
 				context.ajax_loading = false;
 				slider.dispatchEvent(freshrssSliderLoadEvent);
 			};
@@ -177,8 +174,6 @@ function init_slider(slider) {
 	closer.addEventListener('click', function (ev) {
 		if (data_leave_validation(slider) || confirm(context.i18n.confirmation_default)) {
 			slider.querySelectorAll('form').forEach(function (f) { f.reset(); });
-			closer.classList.remove('active');
-			slider.classList.remove('active');
 			return true;
 		} else {
 			return false;
@@ -233,11 +228,18 @@ function init_select_observers() {
 	});
 }
 
-function data_leave_validation(parent) {
+/**
+ * Returns true when no input element is changed, false otherwise.
+ * When excludeForm is defined, will only report changes outside the specified form.
+ */
+function data_leave_validation(parent, excludeForm = null) {
 	const ds = parent.querySelectorAll('[data-leave-validation]');
 
 	for (let i = ds.length - 1; i >= 0; i--) {
 		const input = ds[i];
+		if (excludeForm && excludeForm === input.form) {
+			continue;
+		}
 		if (input.type === 'checkbox' || input.type === 'radio') {
 			if (input.checked != input.getAttribute('data-leave-validation')) {
 				return false;
@@ -251,7 +253,7 @@ function data_leave_validation(parent) {
 
 function init_configuration_alert() {
 	window.onsubmit = function (e) {
-		window.hasSubmit = true;
+		window.hasSubmit = data_leave_validation(document.body, e.submitter ? e.submitter.form : null);
 	};
 	window.onbeforeunload = function (e) {
 		if (window.hasSubmit) {

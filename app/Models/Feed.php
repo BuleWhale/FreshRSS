@@ -636,10 +636,6 @@ class FreshRSS_Feed extends Minz_Model {
 			return null;
 		}
 
-		if (count($view->entries) < 1) {
-			return null;
-		}
-
 		$simplePie = customSimplePie();
 		$simplePie->set_raw_data($view->renderToString());
 		$simplePie->init();
@@ -653,15 +649,37 @@ class FreshRSS_Feed extends Minz_Model {
 		$this->nbPendingNotRead += $n;
 	}
 
+	/**
+	 * Remember to call updateCachedValue($id_feed) or updateCachedValues() just after.
+	 * @return int|false the number of lines affected, or false if not applicable
+	 */
 	public function keepMaxUnread() {
 		$keepMaxUnread = $this->attributes('keep_max_n_unread');
-		if ($keepMaxUnread == false) {
+		if ($keepMaxUnread === null) {
 			$keepMaxUnread = FreshRSS_Context::$user_conf->mark_when['max_n_unread'];
 		}
 		if ($keepMaxUnread > 0 && $this->nbNotRead(false) + $this->nbPendingNotRead > $keepMaxUnread) {
 			$feedDAO = FreshRSS_Factory::createFeedDao();
-			$feedDAO->keepMaxUnread($this->id(), max(0, $keepMaxUnread - $this->nbPendingNotRead));
+			return $feedDAO->keepMaxUnread($this->id(), max(0, $keepMaxUnread - $this->nbPendingNotRead));
 		}
+		return false;
+	}
+
+	/**
+	 * Applies the *mark as read upon gone* policy, if enabled.
+	 * Remember to call updateCachedValue($id_feed) or updateCachedValues() just after.
+	 * @return int|false the number of lines affected, or false if not applicable
+	 */
+	public function markAsReadUponGone() {
+		$readUponGone = $this->attributes('read_upon_gone');
+		if ($readUponGone === null) {
+			$readUponGone = FreshRSS_Context::$user_conf->mark_when['gone'];
+		}
+		if ($readUponGone) {
+			$feedDAO = FreshRSS_Factory::createFeedDao();
+			return $feedDAO->markAsReadUponGone($this->id());
+		}
+		return false;
 	}
 
 	/**
@@ -966,7 +984,7 @@ class FreshRSS_Feed extends Minz_Model {
 				' via hub ' . $hubJson['hub'] .
 				' with callback ' . $callbackUrl . ': ' . $info['http_code'] . ' ' . $response, PSHB_LOG);
 
-			if (substr($info['http_code'], 0, 1) == '2') {
+			if (substr('' . $info['http_code'], 0, 1) == '2') {
 				return true;
 			} else {
 				$hubJson['lease_start'] = time();	//Prevent trying again too soon

@@ -1,7 +1,13 @@
 <header class="header">
 	<div class="item title">
 		<a href="<?= _url('index', 'index') ?>">
-			<img class="logo" src="<?= _i('FreshRSS-logo', true) ?>" alt="" />
+			<?php if (FreshRSS_Context::$system_conf->logo_html == '') { ?>
+				<img class="logo" src="<?= _i('FreshRSS-logo', true) ?>" alt="FreshRSS" />
+			<?php
+				} else {
+					echo FreshRSS_Context::$system_conf->logo_html;
+				}
+			?>
 		</a>
 	</div>
 
@@ -9,8 +15,9 @@
 		<?php if (FreshRSS_Auth::hasAccess() || FreshRSS_Context::$system_conf->allow_anonymous) { ?>
 		<form action="<?= _url('index', 'index') ?>" method="get">
 			<div class="stick">
-				<input type="search" name="search" id="search" class="extend" value="<?php
-					echo htmlspecialchars(htmlspecialchars_decode(FreshRSS_Context::$search, ENT_QUOTES), ENT_COMPAT, 'UTF-8'); ?>" placeholder="<?= _t('gen.menu.search') ?>" />
+				<input type="search" name="search" id="search" class="extend"
+					value="<?= htmlspecialchars(htmlspecialchars_decode(FreshRSS_Context::$search, ENT_QUOTES), ENT_COMPAT, 'UTF-8') ?>"
+					placeholder="<?= _t('gen.menu.search') ?>" />
 
 				<?php $get = Minz_Request::param('get', ''); ?>
 				<?php if ($get != '') { ?>
